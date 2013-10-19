@@ -1,30 +1,37 @@
-require 'net/http'
+require 'faraday'
 require 'json'
+require 'ostruct'
 
 module Wit
 
-  TOKEN = ENV['WIT_TOKEN']
+  class << self
+    attr_accessor :token
 
-  def self.message(message = '')
-    uri = URI("https://api.wit.ai/message?q=#{URI.escape(message)}")
-    http = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) do |http|
-      req = Net::HTTP::Get.new(uri)
-      req['Authorization'] = "Bearer #{TOKEN}"
-      http.request(req)
+    def token
+      @token || ENV['WIT_TOKEN']
     end
-
-    if http.is_a?(Net::HTTPUnauthorized)
-      raise Unauthorized, "incorrect token set for Wit::TOKEN set an env for WIT_TOKEN or set Wit::TOKEN manually"
-    end
-
-    if http.is_a?(Net::HTTPSuccess)
-      return Response.new(JSON.parse(http.body))
-    end
-
-    false
   end
 
-  class Response
+  def self.message(message = '')
+    response = connection.get do |req|
+      req.headers['Authorization'] = "Bearer #{token}"
+      req.url '/message', q: message
+    end
+
+    case response.status
+    when 200 then return Result.new JSON.parse(response.body)
+    when 401 then raise Unauthorized, "incorrect token set for Wit.token set an env for WIT_TOKEN or set Wit::TOKEN manually"
+    else raise BadResponse, "response code: #{response.status}"
+    end
+  end
+
+  def self.connection
+    @connection ||= Faraday.new url: 'https://api.wit.ai' do |faraday|
+      faraday.adapter Faraday.default_adapter
+    end
+  end
+
+  class Result
 
     attr_reader :raw, :msg_id, :msg_body, :intent, :confidence, :entities
 
@@ -34,26 +41,25 @@ module Wit
       @msg_body = hash['msg_body']
       @intent = hash['outcome']['intent']
       @confidence = hash['outcome']['confidence']
-      @entities = {}
+      @entities = EntityCollection.new
       hash['outcome']['entities'].each do |name, entity|
-        @entities[name.to_sym] = Entity.new(entity)
+        @entities.send(:"#{name}=", Entity.new(entity))
       end
     end
 
   end
 
-  class Entity
+  class EntityCollection < OpenStruct
 
-    attr_reader :start, :end, :value, :body
-
-    def initialize(hash)
-      @start = hash['start']
-      @end = hash['end']
-      @value = hash['value']
-      @body = hash['body']
+    def [](name)
+      self.send(name)
     end
 
   end
 
+  class Entity < OpenStruct
+  end
+
   class Unauthorized < Exception; end
+  class BadResponse < Exception; end
 end

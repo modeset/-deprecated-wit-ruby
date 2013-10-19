@@ -14,4 +14,6 @@ Gem::Specification.new do |s|
 
   s.files       = Dir['lib/**/*'] + ['MIT.LICENSE', 'README.md']
   s.test_files  = Dir['{spec}/**/*']
+
+  s.add_dependency "faraday", ">= 0.8.8"
 end
