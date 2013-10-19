@@ -52,7 +52,7 @@ module Wit
   class EntityCollection < OpenStruct
 
     def [](name)
-      self.send(name)
+      send(name.to_sym)
     end
 
   end

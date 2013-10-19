@@ -10,7 +10,7 @@ describe Wit do
       expect( res.msg_body ).to eq 'deploy master foo to bar'
       expect( res.intent ).to eq 'deploy'
       expect( res.entities.branch ).to be_a Wit::Entity
-      expect( res.entities[:branch].value ).to eq 'master'
+      expect( res.entities['branch'].value ).to eq 'master'
     end
 
   end
